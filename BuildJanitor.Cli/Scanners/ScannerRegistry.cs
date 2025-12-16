@@ -1,46 +1,27 @@
-using System.Reflection;
-
 namespace BuildJanitor.Scanners;
 
 public static class ScannerRegistry
 {
-    private static readonly Dictionary<string, Type> _scanners = [];
-
-    static ScannerRegistry()
+    private static readonly Dictionary<string, Func<IProjectScanner>> _scanners = new(StringComparer.OrdinalIgnoreCase)
     {
-        DiscoverScanners();
-    }
-
-    private static void DiscoverScanners()
-    {
-        var scannerTypes = Assembly.GetExecutingAssembly()
-            .GetTypes()
-            .Where(t => t.IsClass && !t.IsAbstract && typeof(IProjectScanner).IsAssignableFrom(t));
-
-        foreach (var type in scannerTypes)
-        {
-            var keyAttr = type.GetCustomAttribute<ScannerKeyAttribute>();
-            if (keyAttr != null)
-            {
-                _scanners[keyAttr.Key.ToLowerInvariant()] = type;
-            }
-        }
-    }
+        ["dotnet"] = () => new DotNetScanner(),
+        ["nodejs"] = () => new NodeJsScanner()
+    };
 
     public static IEnumerable<string> AvailableKeys => _scanners.Keys;
 
     public static IProjectScanner? CreateScanner(string key)
     {
-        if (_scanners.TryGetValue(key.ToLowerInvariant(), out var type))
+        if (_scanners.TryGetValue(key, out var factory))
         {
-            return Activator.CreateInstance(type) as IProjectScanner;
+            return factory();
         }
         return null;
     }
 
     public static IEnumerable<IProjectScanner> CreateScanners(IEnumerable<string>? keys = null)
     {
-        var targetKeys = keys?.Select(k => k.ToLowerInvariant()) ?? _scanners.Keys;
+        var targetKeys = keys ?? _scanners.Keys;
 
         foreach (var key in targetKeys)
         {

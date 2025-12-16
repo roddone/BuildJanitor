@@ -2,7 +2,6 @@ using BuildJanitor.Models;
 
 namespace BuildJanitor.Scanners;
 
-[ScannerKey("nodejs")]
 public class NodeJsScanner : IProjectScanner
 {
     public string Name => "Node.js";

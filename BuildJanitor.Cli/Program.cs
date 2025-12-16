@@ -1,14 +1,31 @@
-using BuildJanitor;
+using System.CommandLine;
 using BuildJanitor.Scanners;
 using BuildJanitor.UI;
-using CommandLine;
 
-Parser.Default.ParseArguments<Options>(args)
-    .WithParsed(Run);
+var pathOption = new Option<string?>(
+    aliases: ["-p", "--path"],
+    description: "Chemin du dossier à scanner. Utilise le dossier courant si non spécifié.");
 
-void Run(Options options)
+var scannersOption = new Option<string[]?>(
+    aliases: ["-s", "--scanners"],
+    description: "Liste des scanners à utiliser (séparés par des virgules). Ex: -s dotnet,nodejs. Utilise tous les scanners si non spécifié.")
 {
-    string rootPath = options.Path ?? Environment.CurrentDirectory;
+    AllowMultipleArgumentsPerToken = true
+};
+
+var rootCommand = new RootCommand("BuildJanitor - Supprime les artefacts de build (.NET bin/obj, node_modules)")
+{
+    pathOption,
+    scannersOption
+};
+
+rootCommand.SetHandler(Run, pathOption, scannersOption);
+
+return await rootCommand.InvokeAsync(args);
+
+void Run(string? path, string[]? scannerKeys)
+{
+    string rootPath = path ?? Environment.CurrentDirectory;
 
     if (!Directory.Exists(rootPath))
     {
@@ -16,7 +33,7 @@ void Run(Options options)
         return;
     }
 
-    var scanners = GetScanners(options.Scanners).ToList();
+    var scanners = GetScanners(scannerKeys).ToList();
 
     if (scanners.Count == 0)
     {
@@ -36,15 +53,17 @@ void Run(Options options)
     ui.Run();
 }
 
-IEnumerable<IProjectScanner> GetScanners(IEnumerable<string>? keys)
+IEnumerable<IProjectScanner> GetScanners(string[]? keys)
 {
-    if (keys == null || !keys.Any())
+    if (keys == null || keys.Length == 0)
     {
         return ScannerRegistry.CreateAllScanners();
     }
 
+    var allKeys = keys.SelectMany(k => k.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
     var scanners = new List<IProjectScanner>();
-    foreach (var key in keys)
+    foreach (var key in allKeys)
     {
         var scanner = ScannerRegistry.CreateScanner(key);
         if (scanner != null)

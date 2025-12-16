@@ -2,7 +2,6 @@ using BuildJanitor.Models;
 
 namespace BuildJanitor.Scanners;
 
-[ScannerKey("dotnet")]
 public class DotNetScanner : IProjectScanner
 {
     public string Name => ".NET";
