@@ -1,0 +1,106 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: 'v0.0.0'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  PROJECT_PATH: 'BuildJanitor.Cli/BuildJanitor.Cli.csproj'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact_name: BuildJanitor-win-x64.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact_name: BuildJanitor-linux-x64
+          - os: macos-latest
+            rid: osx-x64
+            artifact_name: BuildJanitor-osx-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Publish with AOT, Trimming and Single File
+        run: |
+          dotnet publish ${{ env.PROJECT_PATH }} -c Release -r ${{ matrix.rid }} --self-contained -o ./publish -p:PublishAot=true -p:PublishTrimmed=true -p:PublishSingleFile=true
+
+      - name: Rename artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Move-Item -Path ./publish/BuildJanitor.Cli.exe -Destination ./publish/${{ matrix.artifact_name }}
+        shell: pwsh
+
+      - name: Rename artifact (Linux/macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mv ./publish/BuildJanitor.Cli ./publish/${{ matrix.artifact_name }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ./publish/${{ matrix.artifact_name }}
+          retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find ./artifacts -type f -exec mv {} ./release/ \;
+          ls -la ./release/
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+          files: ./release/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
