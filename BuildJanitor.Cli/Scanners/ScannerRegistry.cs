@@ -5,7 +5,8 @@ public static class ScannerRegistry
     private static readonly Dictionary<string, Func<IProjectScanner>> _scanners = new(StringComparer.OrdinalIgnoreCase)
     {
         ["dotnet"] = () => new DotNetScanner(),
-        ["nodejs"] = () => new NodeJsScanner()
+        ["nodejs"] = () => new NodeJsScanner(),
+        ["flutter"] = () => new FlutterScanner()
     };
 
     public static IEnumerable<string> AvailableKeys => _scanners.Keys;

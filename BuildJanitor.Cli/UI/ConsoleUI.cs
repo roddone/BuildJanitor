@@ -57,6 +57,7 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
         var totalSize = _folders.Sum(f => f.Size);
         var dotnetCount = _folders.Count(f => f.Type == ArtifactType.DotNet);
         var nodeCount = _folders.Count(f => f.Type == ArtifactType.NodeJs);
+        var flutterCount = _folders.Count(f => f.Type == ArtifactType.Flutter);
 
         // Title bar
         Console.BackgroundColor = ConsoleColor.DarkBlue;
@@ -69,12 +70,14 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.Write($" .NET: {dotnetCount}");
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"  Node.js: {nodeCount}");
+        Console.Write($"  Node.js: {nodeCount}");
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.WriteLine($"  Flutter: {flutterCount}");
         Console.ResetColor();
 
         // Help
         Console.ForegroundColor = ConsoleColor.DarkGray;
-        Console.WriteLine(" [↑↓] Navigate  [Space] Select  [Enter] Delete  [1] .NET  [2] Node  [Ctrl+A] All  [Q] Quit");
+        Console.WriteLine(" [↑↓] Navigate  [Space] Select  [Enter] Delete  [1] .NET  [2] Node  [3] Flutter  [A] All  [N] None  [Q] Quit");
         Console.ResetColor();
         Console.WriteLine(new string('─', Console.WindowWidth - 1));
     }
@@ -100,14 +103,26 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
         }
 
         string checkbox = folder.IsSelected ? "[X]" : "[ ]";
-        string typeIndicator = folder.Type == ArtifactType.DotNet ? "[.NET]" : "[Node]";
+        string typeIndicator = folder.Type switch
+        {
+            ArtifactType.DotNet => "[.NET]",
+            ArtifactType.NodeJs => "[Node]",
+            ArtifactType.Flutter => "[Flut]",
+            _ => "[????]"
+        };
         string sizeStr = FormatSize(folder.Size).PadLeft(10);
         string pathStr = TruncatePath(folder.Path, Console.WindowWidth - 26);
 
         if (!isCurrent)
         {
             Console.Write($" {checkbox} ");
-            Console.ForegroundColor = folder.Type == ArtifactType.DotNet ? ConsoleColor.Cyan : ConsoleColor.Green;
+            Console.ForegroundColor = folder.Type switch
+            {
+                ArtifactType.DotNet => ConsoleColor.Cyan,
+                ArtifactType.NodeJs => ConsoleColor.Green,
+                ArtifactType.Flutter => ConsoleColor.Magenta,
+                _ => ConsoleColor.White
+            };
             Console.Write(typeIndicator);
             Console.ResetColor();
             Console.WriteLine($" {sizeStr}  {pathStr}".PadRight(Console.WindowWidth - 12));
@@ -162,11 +177,11 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
                 if (_currentIndex < _folders.Count - 1) _currentIndex++;
                 break;
 
-            case ConsoleKey.A when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.A:
                 _folders.ForEach(f => f.IsSelected = true);
                 break;
 
-            case ConsoleKey.D when key.Modifiers == ConsoleModifiers.Control:
+            case ConsoleKey.N:
                 _folders.ForEach(f => f.IsSelected = false);
                 break;
 
@@ -176,6 +191,10 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
 
             case ConsoleKey.D2 or ConsoleKey.NumPad2:
                 ToggleSelection(ArtifactType.NodeJs);
+                break;
+
+            case ConsoleKey.D3 or ConsoleKey.NumPad3:
+                ToggleSelection(ArtifactType.Flutter);
                 break;
 
             case ConsoleKey.Enter:
@@ -235,7 +254,7 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
             try
             {
                 Console.Write($"Deleting {folder.Path}... ");
-                Directory.Delete(folder.Path, true);
+                ForceDelete(folder.Path);
                 deleted++;
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("OK");
@@ -263,6 +282,17 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
         Console.CursorVisible = false;
         Console.Clear();
         return true;
+    }
+
+    private static void ForceDelete(string path)
+    {
+        var dir = new DirectoryInfo(path);
+        foreach (var file in dir.EnumerateFiles("*", SearchOption.AllDirectories))
+        {
+            if (file.Attributes.HasFlag(FileAttributes.ReadOnly))
+                file.Attributes = FileAttributes.Normal;
+        }
+        dir.Delete(true);
     }
 
     private void ToggleSelection(ArtifactType type)

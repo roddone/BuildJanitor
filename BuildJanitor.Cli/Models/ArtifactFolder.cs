@@ -1,6 +1,6 @@
 namespace BuildJanitor.Models;
 
-public enum ArtifactType { DotNet, NodeJs }
+public enum ArtifactType { DotNet, NodeJs, Flutter }
 
 public class ArtifactFolder(string path, long size, ArtifactType type)
 {
