@@ -2,7 +2,7 @@
   "profiles": {
     "BuildJanitor.Cli": {
       "commandName": "Project",
-      "commandLineArgs": "-p C:\\users\\roddone\\source\\repos"
+      "commandLineArgs": "-p D:\\sources"
     }
   }
 }

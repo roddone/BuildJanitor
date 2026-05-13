@@ -286,13 +286,39 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
 
     private static void ForceDelete(string path)
     {
-        var dir = new DirectoryInfo(path);
-        foreach (var file in dir.EnumerateFiles("*", SearchOption.AllDirectories))
+        DeleteRecursive(new DirectoryInfo(LongPath(path)));
+    }
+
+    private static void DeleteRecursive(DirectoryInfo dir)
+    {
+        if (!dir.Exists)
+            return;
+
+        if ((dir.Attributes & FileAttributes.ReparsePoint) != 0)
         {
-            if (file.Attributes.HasFlag(FileAttributes.ReadOnly))
-                file.Attributes = FileAttributes.Normal;
+            dir.Attributes = FileAttributes.Directory;
+            dir.Delete();
+            return;
         }
-        dir.Delete(true);
+
+        foreach (var file in dir.EnumerateFiles())
+        {
+            if ((file.Attributes & FileAttributes.ReadOnly) != 0)
+                file.Attributes = FileAttributes.Normal;
+            file.Delete();
+        }
+
+        foreach (var subDir in dir.EnumerateDirectories())
+            DeleteRecursive(subDir);
+
+        dir.Delete(false);
+    }
+
+    private static string LongPath(string path)
+    {
+        if (!OperatingSystem.IsWindows() || path.StartsWith(@"\\?\") || path.StartsWith(@"\\"))
+            return path;
+        return @"\\?\" + Path.GetFullPath(path);
     }
 
     private void ToggleSelection(ArtifactType type)
