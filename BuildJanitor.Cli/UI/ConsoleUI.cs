@@ -1,5 +1,8 @@
 using BuildJanitor.Models;
 using BuildJanitor.Scanners;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace BuildJanitor.UI;
 
@@ -305,13 +308,47 @@ public class ConsoleUI(List<ArtifactFolder> folders, ArtifactScanner scanner, st
         {
             if ((file.Attributes & FileAttributes.ReadOnly) != 0)
                 file.Attributes = FileAttributes.Normal;
-            file.Delete();
+            DeleteWithAclFallback(file, () => file.Delete());
         }
 
         foreach (var subDir in dir.EnumerateDirectories())
             DeleteRecursive(subDir);
 
-        dir.Delete(false);
+        DeleteWithAclFallback(dir, () => dir.Delete(false));
+    }
+
+    // Some tools protect files with an explicit ACL that denies Delete (e.g. token caches).
+    // The current user is usually the owner, so it can grant itself full control and retry.
+    private static void DeleteWithAclFallback(FileSystemInfo item, Action delete)
+    {
+        try
+        {
+            delete();
+        }
+        catch (UnauthorizedAccessException) when (OperatingSystem.IsWindows())
+        {
+            GrantFullControlToCurrentUser(item);
+            delete();
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static void GrantFullControlToCurrentUser(FileSystemInfo item)
+    {
+        var user = WindowsIdentity.GetCurrent().User!;
+
+        if (item is FileInfo file)
+        {
+            var security = file.GetAccessControl();
+            security.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl, AccessControlType.Allow));
+            file.SetAccessControl(security);
+        }
+        else if (item is DirectoryInfo dir)
+        {
+            var security = dir.GetAccessControl();
+            security.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl, AccessControlType.Allow));
+            dir.SetAccessControl(security);
+        }
     }
 
     private static string LongPath(string path)
