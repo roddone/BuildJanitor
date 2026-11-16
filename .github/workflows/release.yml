@@ -12,7 +12,7 @@ on:
         default: 'v0.0.0'
 
 env:
-  DOTNET_VERSION: '10.0.x'
+  DOTNET_VERSION: '11.0.x'
   PROJECT_PATH: 'BuildJanitor.Cli/BuildJanitor.Cli.csproj'
 
 jobs:

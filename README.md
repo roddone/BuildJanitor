@@ -25,7 +25,7 @@ Download the standalone executable for your platform from the [Releases](../../r
 
 ### From Source
 
-Requires [.NET 10.0 SDK](https://dotnet.microsoft.com/download).
+Requires [.NET 11.0 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
 git clone https://github.com/yourusername/BuildJanitor.git
